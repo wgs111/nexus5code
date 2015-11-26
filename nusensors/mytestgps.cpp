@@ -151,7 +151,10 @@ int main(int argc, char** argv)
     	int outputnum=wgs_atoi(argv[2]);
     	//printf("the outputnum=%d\n",outputnum);
     	//printf("the gps control mode: %s\n",argv[2]);
-    	int err;
+    	int err,i;
+	long long swaptime;
+	long long tmptime;
+	long long endtime;
 	FILE * fp1;
 	char para1[5]="-g";
 	char para2[5]="-o";
@@ -215,22 +218,36 @@ int main(int argc, char** argv)
        		return false;
     	}
     	//sleep(60);   
-
-    	for(int i=0;i<outputnum;i++) {
+	swaptime=sGpsLocation.timestamp;
+	tmptime=100;
+	//endtime=1448378100000;
+	endtime = 1448522100000;
+    	/*for(int i=0;i<outputnum;i++) {
 			sprintf(buf,"num=%d, time=%lld, type=%d, sensor=GPS, value=<%lf,%lf,%lf>, accuracy=%f, status=%d\n",i,sGpsLocation.timestamp,gpstype,sGpsLocation.longitude, sGpsLocation.latitude, sGpsLocation.altitude,sGpsLocation.accuracy,sGpsStatus.status);
 			sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
 		
 
-        	sleep(1);
-    	}
+        	usleep(100000);
+    	}*/
+	i=0;
+	while(1)
+	{
+		if((sGpsLocation.timestamp-swaptime) >= tmptime)
+		{
+			sprintf(buf,"num=%d, time=%lld, type=%d, sensor=GPS, value=<%lf,%lf,%lf>, accuracy=%f, status=%d\n",i,sGpsLocation.timestamp,gpstype,sGpsLocation.longitude, sGpsLocation.latitude, sGpsLocation.altitude,sGpsLocation.accuracy,sGpsStatus.status);
+			sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
+			i++;
+			swaptime=sGpsLocation.timestamp;
+		}//end if((sGpsLocation.timestamp-swaptime) >= tmptime)
+		//if(i== outputnum) break;
+		if(sGpsLocation.timestamp >= endtime) break;
+	}
 
 
-
-
-		sprintf(buf,"stop");
+		sprintf(buf,"stop, the gps endtime=%lld\n",sGpsLocation.timestamp);
 		sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));//发送stop 命令
     		close(socket_descriptor);
-	printf("GPS Messages Sent,terminating\n");
+	printf("GPS Messages Sent,terminating, the gps endtime=%lld\n",sGpsLocation.timestamp);
     	if(strcmp("continue",argv[3])==0) return 0;
 
     	sGpsInterface->stop();

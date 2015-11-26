@@ -15,6 +15,7 @@
 #define acctype 2
 #define gyrtype 3
 #define bartype 4
+#define lacctype 5
 #define port 6789
 #define maxlen 1024
 
@@ -64,7 +65,7 @@ int wgs_atoi(char * str)
 int main(int argc, char** argv)
 {
 	//mytestsensor -o/-g waittime outputnum
-    int err;
+    int err,stype[6]={0};
     struct sensors_poll_device_t* device;
     struct sensors_module_t* module;
     FILE *fp , *fp1;
@@ -152,68 +153,102 @@ int main(int argc, char** argv)
 
 
     int j=0;
+	long long swaptime=0;
+	long long tmptime=waittime;//100000000
+	//long long endtime=1448378100000000000;
+	long long endtime = 1448522100000000000;
 
     do {
-        int n = device->poll(device, buffer, numEvents);
-        if (n < 0) {
-            printf("poll() failed (%s)\n", strerror(-err));
-            break;
-        }
+        	int n = device->poll(device, buffer, numEvents);
+        	if (n < 0) {
+            		printf("poll() failed (%s)\n", strerror(-err));
+            		break;
+        	}
+		if((buffer[0].timestamp-swaptime)>= waittime)
+		{
+			memset(stype,0,6*sizeof(int));
+        		//printf("read %d events:\n", n);
+			//fprintf(fp,"read %d events:\n", n);
+        		for (int i=0 ; i<n ; i++) {
+            			const sensors_event_t& data = buffer[i];
 
-        //printf("read %d events:\n", n);
-	//fprintf(fp,"read %d events:\n", n);
-        for (int i=0 ; i<n ; i++) {
-            const sensors_event_t& data = buffer[i];
-
-            if (data.version != sizeof(sensors_event_t)) {
-                printf("incorrect event version (version=%d, expected=%d",
-                        data.version, sizeof(sensors_event_t));
-                break;
-            }
-			switch(data.type) {
-			 	case SENSOR_TYPE_ACCELEROMETER:
-				sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=<%5.1f,%5.1f,%5.1f>\n",
-				j,
-				data.timestamp,
-				acctype,                            	
-				getSensorName(data.type),
-                            	data.data[0],
-                            	data.data[1],
-                            	data.data[2]);
-		    		break;
+            			if (data.version != sizeof(sensors_event_t)) {
+                			printf("incorrect event version (version=%d, expected=%d",
+                        		data.version, sizeof(sensors_event_t));
+                			break;
+            			}//end if(data.version != sizeof(sensors_event_t))
+		
+				//if((data.timestamp-swaptime)>= waittime)
+				if(data.type == SENSOR_TYPE_ACCELEROMETER && stype[acctype]==0)
+				{
+					sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=<%5.1f,%5.1f,%5.1f>\n",
+					j,
+					data.timestamp,
+					acctype,                            	
+					getSensorName(data.type),
+                            		data.data[0],
+                            		data.data[1],
+                            		data.data[2]);
+					stype[acctype]=1;
+					sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
+		    		}//end if(data.type == SENSOR_TYPE_ACCELEROMETER && stype[acctype]==0)
 				
-				case SENSOR_TYPE_GYROSCOPE:
-				sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=<%5.1f,%5.1f,%5.1f>\n",
-                            	j,
-				data.timestamp,
-				gyrtype,
-				getSensorName(data.type),
-                            	data.data[0],
-                            	data.data[1],
-                            	data.data[2]);
-				break;
+				else if(data.type == SENSOR_TYPE_GYROSCOPE && stype[gyrtype]==0)
+				{
+					sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=<%5.1f,%5.1f,%5.1f>\n",
+                            		j,
+					data.timestamp,
+					gyrtype,
+					getSensorName(data.type),
+                            		data.data[0],
+                            		data.data[1],
+                            		data.data[2]);
+					stype[gyrtype]=1;
+					sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
+				}//end else if(data.type == SENSOR_TYPE_GYROSCOPE && stype[gyrtype]==0)
 			
-				case SENSOR_TYPE_PRESSURE:
-				sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=%f\n",
-				j,
-				data.timestamp,				
-				bartype,
-                            	getSensorName(data.type),
-                            	data.data[0]);
-				break;
-			}
-		sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
-        }
-	//usleep(400000);
-        usleep(waittime);
-	j++;
-	if(outputnum==j) break;
+				else if(data.type == SENSOR_TYPE_LINEAR_ACCELERATION && stype[lacctype]==0)
+				{
+					sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=<%5.1f,%5.1f,%5.1f>\n",
+                            		j,
+					data.timestamp,
+					lacctype,
+					getSensorName(data.type),
+                            		data.data[0],
+                            		data.data[1],
+                            		data.data[2]);
+					stype[lacctype]=1;
+					sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
+				}//end 	else if(data.type == SENSOR_TYPE_LINEAR_ACCELERATION && stype[lacctype]==0)	
+
+				else if(data.type == SENSOR_TYPE_PRESSURE && stype[bartype]==0)
+				{
+					sprintf(buf,"num=%d, time=%lld, type=%d, sensor=%s, value=%f\n",
+					j,
+					data.timestamp,				
+					bartype,
+                            		getSensorName(data.type),
+                            		data.data[0]);
+					stype[bartype]=1;
+					sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));
+					//break;
+				}//end else if(data.type == SENSOR_TYPE_PRESSURE && stype[bartype]==0)
+		
+        		}//end for (int i=0 ; i<n ; i++)
+			//usleep(400000);
+        		//usleep(waittime);
+			j++;
+			//if(outputnum==j) break;
+			if(buffer[0].timestamp>=endtime) break;
+			swaptime=buffer[0].timestamp;
+		}//end if((buffer[0].timestamp-swaptime)>= waittime)
+		
     } while (1); // fix that
 
-	 sprintf(buf,"stop");
+	 sprintf(buf,"stop, the sensors endtime=%lld\n",buffer[0].timestamp);
     	sendto(socket_descriptor,buf,sizeof(buf),0,(struct sockaddr *)&address,sizeof(address));//发送stop 命令
     	close(socket_descriptor);
-    	printf("sensor Messages Sent,terminating\n");
+    	printf("sensor Messages Sent,terminating, the sensors endtime=%lld\n",buffer[0].timestamp);
 
     //exit(0);
 
